@@ -18,9 +18,11 @@
         
         /* 範本選擇區 */
         .template-options { display: flex; gap: 15px; margin-bottom: 10px; flex-wrap: wrap; }
-        .radio-label { cursor: pointer; display: flex; align-items: center; gap: 5px; background: #f8f9fa; padding: 8px 15px; border-radius: 20px; border: 1px solid #ddd; }
+        .radio-label { cursor: pointer; display: flex; align-items: center; gap: 5px; background: #f8f9fa; padding: 8px 15px; border-radius: 20px; border: 1px solid #ddd; transition: all 0.2s; }
         .radio-label:hover { background: #e9ecef; }
+        /* 選中時的樣式 */
         input[type="radio"]:checked + span { color: #2980b9; font-weight: bold; }
+        .radio-label:has(input:checked) { background: #e8f4fd; border-color: #2980b9; }
         
         /* 檔案上傳 */
         input[type="file"] { display: block; width: 100%; padding: 10px; background: #fafafa; border: 1px dashed #ccc; margin-top: 5px; }
@@ -33,8 +35,6 @@
         button:hover { background-color: #219150; transform: translateY(-1px); }
         
         #status { margin-top: 20px; padding: 15px; text-align: center; font-weight: bold; border-radius: 6px; }
-        .tag-box { background: #e8f4fd; padding: 10px; border-radius: 4px; font-family: monospace; color: #c7254e; font-size: 0.9em; word-break: break-all; margin-top: 5px; }
-        
         .warn-text { color: #e67e22; font-size: 0.85em; margin-top: 5px; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.11/docxtemplater.js"></script>
@@ -51,19 +51,19 @@
         <div class="section-title">1. 選擇合約範本</div>
         <div class="template-options">
             <label class="radio-label">
-                <input type="radio" name="templateType" value="group" onclick="toggleTemplateUpload(false)" checked> 
+                <input type="radio" name="templateType" value="group" onchange="handleTemplateChange()" checked> 
                 <span>國外團體</span>
             </label>
             <label class="radio-label">
-                <input type="radio" name="templateType" value="individual" onclick="toggleTemplateUpload(false)"> 
+                <input type="radio" name="templateType" value="individual" onchange="handleTemplateChange()"> 
                 <span>國外個別</span>
             </label>
             <label class="radio-label">
-                <input type="radio" name="templateType" value="individualcn" onclick="toggleTemplateUpload(false)"> 
+                <input type="radio" name="templateType" value="individualcn" onchange="handleTemplateChange()"> 
                 <span>大陸個別</span>
             </label>
             <label class="radio-label">
-                <input type="radio" name="templateType" value="custom" onclick="toggleTemplateUpload(true)"> 
+                <input type="radio" name="templateType" value="custom" onchange="handleTemplateChange()"> 
                 <span>上傳其他範本</span>
             </label>
         </div>
@@ -71,11 +71,14 @@
         <div id="customUploadArea" style="display:none;">
             <input type="file" id="customTemplateFile" accept=".docx" />
         </div>
+        <div class="warn-text">
+            💡 提示：選擇「國外個別」或「大陸個別」時，下方的日期空格會自動調整為 3 格。
+        </div>
     </div>
 
     <div class="section">
         <div class="section-title">2. 上傳科威檔案並編輯資料</div>
-        <p style="font-size:0.9em; margin-bottom:10px;">請上傳科威匯出的.doc檔案(列印>保險名單>點word)，系統將自動解析並顯示於下方供您修改。</p>
+        <p style="font-size:0.9em; margin-bottom:10px;">請上傳科威匯出的.doc檔案，系統將自動解析並顯示於下方。</p>
         <input type="file" id="dataFile" accept=".doc,.html,.htm" onchange="previewData()" />
         
         <div id="previewSection" style="display:none; margin-top:20px; border-top: 1px dashed #ddd; padding-top: 20px;">
@@ -98,7 +101,7 @@
                     <input type="text" id="prev_country">
                 </div>
                 <div>
-                    <label>成團人數 (最低出團人數)</label>
+                    <label>成團人數</label>
                     <input type="number" id="prev_minPax" value="16">
                 </div>
                 <div class="full-width">
@@ -134,12 +137,43 @@
         "TPE": "台灣", "KHH": "台灣" 
     };
 
-    // 切換範本上傳框顯示
-    function toggleTemplateUpload(show) {
-        document.getElementById('customUploadArea').style.display = show ? 'block' : 'none';
+    // 處理範本切換事件 (合併顯示上傳框與更新日期格式)
+    function handleTemplateChange() {
+        const radio = document.querySelector('input[name="templateType"]:checked');
+        const val = radio.value;
+        
+        // 1. 控制自訂上傳框顯示
+        const uploadArea = document.getElementById('customUploadArea');
+        uploadArea.style.display = (val === 'custom') ? 'block' : 'none';
+
+        // 2. 立即觸發日期格式更新
+        updateDateSpacing();
     }
 
-    // 當團號改變時，重新判別國家
+    // === 核心功能：動態調整日期空格 (所見即所得) ===
+    function updateDateSpacing() {
+        const dateInput = document.getElementById('prev_date');
+        let val = dateInput.value.trim();
+        if (!val) return;
+
+        // 用正則抓出年、月、日 (不管中間有幾個空格)
+        const match = val.match(/^(\d+)\s+(\d+)\s+(\d+)$/);
+        
+        if (match) {
+            const [_, y, m, d] = match;
+            const templateType = document.querySelector('input[name="templateType"]:checked').value;
+            
+            // 決定空格數量
+            let spaces = "  "; // 預設 2 格 (團體)
+            if (templateType === 'individual' || templateType === 'individualcn') {
+                spaces = "   "; // 個別約 3 格
+            }
+            
+            // 重新組裝並寫回輸入框
+            dateInput.value = `${y}${spaces}${m}${spaces}${d}`;
+        }
+    }
+
     function updateCountryFromCode() {
         const groupCode = document.getElementById('prev_groupNo').value;
         if(groupCode.length >= 3) {
@@ -149,7 +183,6 @@
         }
     }
 
-    // 預覽功能：解析系統檔案並填入輸入框
     async function previewData() {
         const dataInput = document.getElementById('dataFile').files[0];
         if (!dataInput) return;
@@ -160,22 +193,22 @@
             const doc = parser.parseFromString(dataText, "text/html");
             const extracted = parseSystemData(doc);
 
-            // 儲存全域變數
             globalExtractedPax = extracted.passengers;
 
-            // 1. 填入輸入框
             document.getElementById('prev_groupName').value = extracted.groupInfo.團名;
             document.getElementById('prev_groupNo').value = extracted.groupInfo.團號;
+            
+            // 初始填入日期
             document.getElementById('prev_date').value = toRocDate(extracted.groupInfo.出發日期);
             
-            // 2. 自動判別國家
             updateCountryFromCode();
+            
+            // *** 重要：資料載入後，立刻依照當前選擇的範本調整空格 ***
+            updateDateSpacing();
 
-            // 3. 顯示旅客預覽
             const paxPreviewDiv = document.getElementById('paxListPreview');
             paxPreviewDiv.innerText = `共 ${globalExtractedPax.length} 位：` + globalExtractedPax.map(p=>p.姓名).join("、");
 
-            // 顯示區塊
             document.getElementById('previewSection').style.display = 'block';
 
         } catch (e) {
@@ -184,14 +217,13 @@
         }
     }
 
-    // 下載範本檔案
     async function loadDefaultTemplate(filename) {
         try {
             const response = await fetch(filename);
             if (!response.ok) throw new Error(`找不到檔案 ${filename}`);
             return await response.arrayBuffer();
         } catch (e) {
-            alert(`讀取預設範本失敗：\n請確認 ${filename} 是否與此網頁在同一資料夾中。\n\n(若使用 Chrome 直接開啟 HTML，可能會因安全性被阻擋，請嘗試手動上傳範本)`);
+            alert(`讀取預設範本失敗：\n請確認 ${filename} 是否與此網頁在同一資料夾中。\n\n(若使用 Chrome，請嘗試手動上傳範本)`);
             throw e;
         }
     }
@@ -199,7 +231,6 @@
     async function generateContracts() {
         const statusDiv = document.getElementById('status');
         
-        // 1. 決定使用哪個範本
         let templateArrayBuffer = null;
         const templateType = document.querySelector('input[name="templateType"]:checked').value;
         let templateFilename = 'group.docx';
@@ -210,19 +241,15 @@
                 if (!fileInput) { alert("請上傳自訂範本！"); return; }
                 templateArrayBuffer = await readFileAsArrayBuffer(fileInput);
             } else {
-                // 根據類型選擇檔案
                 if (templateType === 'group') templateFilename = 'group.docx';
                 else if (templateType === 'individual') templateFilename = 'individual.docx';
                 else if (templateType === 'individualcn') templateFilename = 'individualcn.docx';
-                
                 templateArrayBuffer = await loadDefaultTemplate(templateFilename);
             }
-        } catch (e) {
-            return; 
-        }
+        } catch (e) { return; }
 
         if (globalExtractedPax.length === 0) {
-            alert("尚未讀取到旅客資料，請先上傳系統檔案！");
+            alert("尚未讀取到旅客資料！");
             return;
         }
 
@@ -231,54 +258,39 @@
         
         try {
             const zip = new PizZip(templateArrayBuffer);
-            const docx = new window.docxtemplater(zip, {
-                paragraphLoop: true,
-                linebreaks: true,
-            });
+            const docx = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
-            // --- 從「編輯區」取得最終資料 ---
             const finalGroupNo = document.getElementById('prev_groupNo').value;
             const finalGroupName = document.getElementById('prev_groupName').value;
-            let finalDate = document.getElementById('prev_date').value;
+            
+            // 直接拿預覽框的值 (因為 updateDateSpacing 已經保證它是對的)
+            const finalDate = document.getElementById('prev_date').value;
+            
             const finalCountry = document.getElementById('prev_country').value;
             const finalAgency = document.getElementById('prev_agency').value;
             const finalMinPax = document.getElementById('prev_minPax').value;
 
-            // === 邏輯修正 1：依照範本類型調整日期空格 ===
-            // 預設是 2 格，如果是個別約，改成 3 格
-            if (templateType === 'individual' || templateType === 'individualcn') {
-                // 將所有連續的2個空白換成3個空白 (確保格式一致)
-                finalDate = finalDate.replace(/  /g, "   ");
-            }
-
-            // --- 旅客名單邏輯 ---
             const allPax = globalExtractedPax;
             const totalCount = allPax.length;
-            let mainNameStr = "";
-            let sideNameStr = "";
-            let fullListStr = "";
+            let mainNameStr = "", sideNameStr = "", fullListStr = "";
 
             if (totalCount > 0) {
-                const firstTwo = allPax.slice(0, 2);
-                mainNameStr = firstTwo.map(p => p.姓名).join("、");
+                mainNameStr = allPax.slice(0, 2).map(p => p.姓名).join("、");
             }
 
             if (totalCount > 14) {
                 sideNameStr = "名單如附件";
-                const firstPaxName = allPax[0].姓名;
-                fullListStr = `${firstPaxName} 等共 ${totalCount} 位 名單如附件`;
+                fullListStr = `${allPax[0].姓名} 等共 ${totalCount} 位 名單如附件`;
             } else {
                 const restPax = allPax.slice(2);
                 let lines = [];
                 for (let i = 0; i < restPax.length; i += 3) {
-                    const chunk = restPax.slice(i, i + 3).map(p => p.姓名).join("、");
-                    lines.push(chunk);
+                    lines.push(restPax.slice(i, i + 3).map(p => p.姓名).join("、"));
                 }
                 sideNameStr = lines.join("\n");
                 fullListStr = allPax.map(p => p.姓名).join("、");
             }
 
-            // 組合資料
             const contractData = {
                 "團號": finalGroupNo,
                 "團名": finalGroupName,
@@ -299,10 +311,8 @@
                 mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             });
 
-            // === 邏輯修正 2：檔名優化 ===
-            // 移除 "旅行社" 三個字
+            // 檔名優化：去除 "旅行社"
             const agencyShort = finalAgency.replace(/旅行社/g, "");
-            // 組合檔名: 團號 + 簡短旅行社名 + 合約.docx
             const outputFileName = `${finalGroupNo}${agencyShort}合約.docx`;
 
             saveAs(blob, outputFileName);
@@ -318,7 +328,6 @@
         }
     }
 
-    // --- 輔助：日期轉民國年 (預設回傳 2 格空白) ---
     function toRocDate(dateStr) {
         if (!dateStr) return "";
         const dateObj = new Date(dateStr);
@@ -326,11 +335,10 @@
         const year = dateObj.getFullYear() - 1911;
         const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
         const day = dateObj.getDate().toString().padStart(2, '0');
-        // 預設中間空兩格
+        // 預設給個初始值，真正格式由 updateDateSpacing 控制
         return `${year}  ${month}  ${day}`;
     }
 
-    // --- 解析邏輯 ---
     function parseSystemData(doc) {
         let groupNo = "";
         const groupNoMatch = doc.body.innerHTML.match(/團號：(.*?)&nbsp;/);
