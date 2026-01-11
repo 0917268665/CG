@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>世興合約自動生成器</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: #f4f6f9; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 20px; font-size: 24px; }
+        
+        .section { margin-bottom: 20px; padding: 20px; border: 1px solid #e1e4e8; border-radius: 8px; background-color: #fff; }
+        .section-title { font-weight: bold; color: #2980b9; margin-bottom: 15px; border-bottom: 2px solid #f0f0f0; padding-bottom: 5px; display: flex; align-items: center; justify-content: space-between; }
+        
+        /* 表單控制項 */
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; font-size: 0.95em; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; background-color: #fcfcfc; transition: border 0.3s; }
+        input[type="text"]:focus, input[type="number"]:focus { border-color: #2980b9; background-color: #fff; outline: none; }
+        
+        /* 範本選擇區 */
+        .template-options { display: flex; gap: 15px; margin-bottom: 10px; }
+        .radio-label { cursor: pointer; display: flex; align-items: center; gap: 5px; background: #f8f9fa; padding: 8px 15px; border-radius: 20px; border: 1px solid #ddd; }
+        .radio-label:hover { background: #e9ecef; }
+        input[type="radio"]:checked + span { color: #2980b9; font-weight: bold; }
+        
+        /* 檔案上傳 */
+        input[type="file"] { display: block; width: 100%; padding: 10px; background: #fafafa; border: 1px dashed #ccc; margin-top: 5px; }
+
+        /* 預覽編輯區 */
+        .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .full-width { grid-column: span 2; }
+        
+        button { background-color: #27ae60; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 20px; transition: background 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button:hover { background-color: #219150; transform: translateY(-1px); }
+        
+        #status { margin-top: 20px; padding: 15px; text-align: center; font-weight: bold; border-radius: 6px; }
+        .tag-box { background: #e8f4fd; padding: 10px; border-radius: 4px; font-family: monospace; color: #c7254e; font-size: 0.9em; word-break: break-all; margin-top: 5px; }
+        
+        .warn-text { color: #e67e22; font-size: 0.85em; margin-top: 5px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.11/docxtemplater.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
+</script>
+</head>
+<body>
+
+<div class="container">
+    <h1>✈️ 世興合約自動生成器</h1>
+    
+    <div class="section">
+        <div class="section-title">1. 選擇合約範本</div>
+        <div class="template-options">
+            <label class="radio-label">
+                <input type="radio" name="templateType" value="group" onclick="toggleTemplateUpload(false)" checked> 
+                <span>國外團體</span>
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="templateType" value="individual" onclick="toggleTemplateUpload(false)"> 
+                <span>國外個別</span>
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="templateType" 
+value="individualcn" onclick="toggleTemplateUpload(false)"> 
+                <span>大陸個別</span>
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="templateType" value="custom" onclick="toggleTemplateUpload(true)"> 
+                <span>上傳其他範本</span>
+            </label>
+        </div>
+        
+        <div id="customUploadArea" style="display:none;">
+            <input type="file" id="customTemplateFile" accept=".docx" />
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">2. 上傳科威檔案並編輯資料</div>
+        <p style="font-size:0.9em; margin-bottom:10px;">請上傳科威匯出的.doc檔案(列印>保險名單>點word)，系統將自動解析並顯示於下方供您修改。</p>
+        <input type="file" id="dataFile" accept=".doc,.html,.htm" onchange="previewData()" />
+        
+        <div id="previewSection" style="display:none; margin-top:20px; border-top: 1px dashed #ddd; padding-top: 20px;">
+            <h3 style="margin-top:0; color:#2c3e50;">📝 資料預覽與編輯</h3>
+            <div class="preview-grid">
+                <div class="full-width">
+                    <label>團名</label>
+                    <input type="text" id="prev_groupName">
+                </div>
+                <div>
+                    <label>團號</label>
+                    <input type="text" id="prev_groupNo" onchange="updateCountryFromCode()">
+                </div>
+                <div>
+                    <label>出發日期 (民國年)</label>
+                    <input type="text" id="prev_date">
+                </div>
+                <div>
+                    <label>旅遊國家 (自動判別)</label>
+                    <input type="text" id="prev_country">
+                </div>
+                <div>
+                    <label>成團人數 (最低出團人數)</label>
+                    <input type="number" id="prev_minPax" value="16">
+                </div>
+                <div class="full-width">
+                    <label>協辦旅行社</label>
+                    <input type="text" id="prev_agency" value="旅行社">
+                </div>
+            </div>
+            <div style="margin-top:15px; background:#f8f9fa; padding:10px; border-radius:5px;">
+                <label>系統識別到的旅客 (僅供確認，請勿在此修改)</label>
+                <div id="paxListPreview" style="font-size:0.9em; color:#666; max-height:100px; overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <button onclick="generateContracts()">🚀 確認資料無誤，生成 Word 合約</button>
+    <div id="status"></div>
+</div>
+
+<script>
+    // === 全域變數 ===
+    let globalExtractedPax = []; // 儲存解析出來的旅客名單
+    
+    // === 機場代碼對照表 ===
+    const AIRPORT_MAP = {
+        "TYO": "日本", "NRT": "日本", "HND": "日本", "KIX": "日本", "FUK": "日本",
+        "CTS": "日本", "OKA": "日本", "SDJ": "日本", "KMQ": "日本", "HKD": "日本",
+        "SEL": "韓國", "ICN": "韓國", "GMP": "韓國", "PUS": "韓國", "CJU": "韓國", "MWX": "韓國", "TAE": "韓國",
+        "BKK": "泰國", "DMK": "泰國", "CNX": "泰國", "HKT": "泰國",
+        "DAD": "越南", "HAN": "越南", "SGN": "越南", "CXR": "越南", "PQC": "越南",
+        "SIN": "新加坡", "KUL": "馬來西亞", "BKI": "馬來西亞",
+        "MNL": "菲律賓", "CEB": "菲律賓", "KLO": "菲律賓",
+        "HKG": "香港", "MFM": "澳門", "PEK": "中國大陸", "PVG": "中國大陸", "SHA": "中國大陸",
+        "TPE": "台灣", "KHH": "台灣" 
+    };
+
+    // 切換範本上傳框顯示
+    function toggleTemplateUpload(show) {
+        document.getElementById('customUploadArea').style.display = show ? 'block' : 'none';
+    }
+
+    // 當團號改變時，重新判別國家
+    function updateCountryFromCode() {
+        const groupCode = document.getElementById('prev_groupNo').value;
+        if(groupCode.length >= 3) {
+            const code = groupCode.substring(0, 3).toUpperCase();
+            const country = AIRPORT_MAP[code];
+            if(country) document.getElementById('prev_country').value = country;
+        }
+    }
+
+    // 預覽功能：解析系統檔案並填入輸入框
+    async function previewData() {
+        const dataInput = document.getElementById('dataFile').files[0];
+        if (!dataInput) return;
+
+        try {
+            const dataText = await readFileAsText(dataInput);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(dataText, "text/html");
+            const extracted = parseSystemData(doc);
+
+            // 儲存全域變數
+            globalExtractedPax = extracted.passengers;
+
+            // 1. 填入輸入框 (User 可修改)
+            document.getElementById('prev_groupName').value = extracted.groupInfo.團名;
+            document.getElementById('prev_groupNo').value = extracted.groupInfo.團號;
+            document.getElementById('prev_date').value = toRocDate(extracted.groupInfo.出發日期);
+            
+            // 2. 嘗試抓取成團人數 (如果抓不到預設 16)
+            // 在您的截圖中，成團人數似乎在某些欄位，我們嘗試解析，若無則保留預設值
+            // 這裡簡單實作：若系統檔內有 "16" 這種獨立數字，可以嘗試抓，但目前先讓 user 確認
+            // document.getElementById('prev_minPax').value = "16"; 
+            
+            // 3. 自動判別國家
+            updateCountryFromCode();
+
+            // 4. 顯示旅客預覽
+            const paxPreviewDiv = document.getElementById('paxListPreview');
+            paxPreviewDiv.innerText = `共 ${globalExtractedPax.length} 位：` + globalExtractedPax.map(p=>p.姓名).join("、");
+
+            // 顯示區塊
+            document.getElementById('previewSection').style.display = 'block';
+
+        } catch (e) {
+            console.error(e);
+            alert("檔案讀取失敗，請確認格式是否正確。");
+        }
+    }
+
+    // 下載範本檔案 (用於預設按鈕)
+    async function loadDefaultTemplate(filename) {
+        try {
+            const response = await fetch(filename);
+            if (!response.ok) throw new Error(`找不到檔案 ${filename}`);
+            return await response.arrayBuffer();
+        } catch (e) {
+            alert(`讀取預設範本失敗：\n請確認 ${filename} 是否與此網頁在同一資料夾中。\n\n(若使用 Chrome 直接開啟 HTML，可能會因安全性被阻擋，請嘗試手動上傳範本)`);
+            throw e;
+        }
+    }
+
+    async function generateContracts() {
+        const statusDiv = document.getElementById('status');
+        
+        // 1. 決定使用哪個範本
+        let templateArrayBuffer = null;
+        const templateType = document.querySelector('input[name="templateType"]:checked').value;
+
+        try {
+            if (templateType === 'custom') {
+                const fileInput = document.getElementById('customTemplateFile').files[0];
+                if (!fileInput) { alert("請上傳自訂範本！"); return; }
+                templateArrayBuffer = await readFileAsArrayBuffer(fileInput);
+            } else if (templateType === 'group') {
+                templateArrayBuffer = await loadDefaultTemplate('group.docx');
+            } else {
+                templateArrayBuffer = await loadDefaultTemplate('individual.docx');
+            }
+        } catch (e) {
+            return; // 錯誤已在 loadDefaultTemplate 處理
+        }
+
+        if (globalExtractedPax.length === 0) {
+            alert("尚未讀取到旅客資料，請先上傳系統檔案！");
+            return;
+        }
+
+        statusDiv.innerText = "⏳ 正在生成...";
+        statusDiv.style.backgroundColor = "#fff3cd";
+        
+        try {
+            const zip = new PizZip(templateArrayBuffer);
+            const docx = new window.docxtemplater(zip, {
+                paragraphLoop: true,
+                linebreaks: true,
+            });
+
+            // --- 從「編輯區」取得最終資料 ---
+            const finalGroupNo = document.getElementById('prev_groupNo').value;
+            const finalGroupName = document.getElementById('prev_groupName').value;
+            const finalDate = document.getElementById('prev_date').value;
+            const finalCountry = document.getElementById('prev_country').value;
+            const finalAgency = document.getElementById('prev_agency').value;
+            const finalMinPax = document.getElementById('prev_minPax').value;
+
+            // --- 旅客名單邏輯 ---
+            const allPax = globalExtractedPax;
+            const totalCount = allPax.length;
+            let mainNameStr = "";
+            let sideNameStr = "";
+            let fullListStr = "";
+
+            if (totalCount > 0) {
+                const firstTwo = allPax.slice(0, 2);
+                mainNameStr = firstTwo.map(p => p.姓名).join("、");
+            }
+
+            if (totalCount > 14) {
+                sideNameStr = "名單如附件";
+                const firstPaxName = allPax[0].姓名;
+                fullListStr = `${firstPaxName} 等共 ${totalCount} 位 名單如附件`;
+            } else {
+                const restPax = allPax.slice(2);
+                let lines = [];
+                for (let i = 0; i < restPax.length; i += 3) {
+                    const chunk = restPax.slice(i, i + 3).map(p => p.姓名).join("、");
+                    lines.push(chunk);
+                }
+                sideNameStr = lines.join("\n");
+                fullListStr = allPax.map(p => p.姓名).join("、");
+            }
+
+            // 組合資料
+            const contractData = {
+                "團號": finalGroupNo,
+                "團名": finalGroupName,
+                "出發日期": finalDate,
+                "旅遊國家": finalCountry,
+                "協辦旅行社": finalAgency,
+                "成團人數": finalMinPax, // 新增欄位
+                
+                "主要姓名": mainNameStr,
+                "配角名單": sideNameStr,
+                "人數": totalCount,
+                "完整姓名串": fullListStr
+            };
+
+            docx.render(contractData);
+            
+            const blob = docx.getZip().generate({
+                type: "blob",
+                mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            });
+
+            saveAs(blob, `${finalGroupNo}_合約.docx`);
+            
+            statusDiv.innerHTML = `🎉 成功！檔案：${finalGroupNo}_合約.docx<br>請確認 Word 內容後轉存 PDF。`;
+            statusDiv.style.backgroundColor = "#d4edda";
+
+        } catch (error) {
+            console.error(error);
+            alert("發生錯誤：" + error.message);
+            statusDiv.innerText = "❌ 發生錯誤";
+            statusDiv.style.backgroundColor = "#f8d7da";
+        }
+    }
+
+    // --- 輔助：日期轉民國年 ---
+    function toRocDate(dateStr) {
+        if (!dateStr) return "";
+        const dateObj = new Date(dateStr);
+        if (isNaN(dateObj.getTime())) return dateStr;
+        const year = dateObj.getFullYear() - 1911;
+        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+        const day = dateObj.getDate().toString().padStart(2, '0');
+        return `${year}  ${month}  ${day}`;
+    }
+
+    // --- 解析邏輯 ---
+    function parseSystemData(doc) {
+        // 這些解析邏輯沿用之前的，但資料會先傳給 Preview 介面
+        let groupNo = "";
+        const groupNoMatch = doc.body.innerHTML.match(/團號：(.*?)&nbsp;/);
+        if (groupNoMatch) groupNo = groupNoMatch[1].trim();
+
+        let groupName = "";
+        const groupNameMatch = doc.body.innerHTML.match(/團名：(.*?)<\/td>/);
+        if (!groupNameMatch) {
+             const txt = doc.body.innerText;
+             const m = txt.match(/團名：(.*?)\n/);
+             if(m) groupName = m[1].trim();
+        } else {
+             groupName = groupNameMatch[1].replace(/<.*?>/g, "").trim();
+        }
+
+        let date = "";
+        const dateMatch = doc.body.textContent.match(/期間：(\d{4}\/\d{2}\/\d{2})/);
+        if (dateMatch) date = dateMatch[1];
+
+        const passengers = [];
+        const tables = doc.querySelectorAll('table[border="1"]');
+        tables.forEach(table => {
+            const rows = table.rows;
+            if (rows.length > 0) {
+                const cells = rows[0].cells;
+                if (cells.length >= 5) {
+                    const no = cells[0].innerText.trim();
+                    if (!isNaN(no) && no !== "NO") {
+                        let rawName = cells[1].innerText.trim();
+                        let cleanName = rawName.split(/[a-zA-Z]/)[0].trim();
+                        cleanName = cleanName.replace(/\//g, "");
+                        passengers.push({ "姓名": cleanName });
+                    }
+                }
+            }
+        });
+
+        return {
+            groupInfo: { "團號": groupNo, "團名": groupName, "出發日期": date },
+            passengers: passengers
+        };
+    }
+
+    function readFileAsText(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsText(file, "UTF-8");
+        });
+    }
+
+    function readFileAsArrayBuffer(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsArrayBuffer(file);
+        });
+    }
+</script>
+
+</body>
+</html>
