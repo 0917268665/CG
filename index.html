@@ -81,6 +81,13 @@
         <p style="font-size:0.9em; margin-bottom:10px;">請上傳科威匯出的.doc檔案，系統將自動解析並顯示於下方。</p>
         <input type="file" id="dataFile" accept=".doc,.html,.htm" onchange="previewData()" />
         
+        <div style="margin-top:15px; border-top:1px dashed #ddd; padding-top:10px; background-color: #fcfcfc; padding: 10px; border-radius: 6px;">
+            <p style="font-size:0.9em; color:#666; margin:0 0 5px 0;">👇 若檔案無法辨識，請直接貼上整串文字 (如: CJJ05260206A 韓國首爾...)</p>
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="rawStringInput" placeholder="在此貼上團號+團名文字串" style="flex:1;">
+                <button onclick="parseManualString()" style="width:auto; margin-top:0; padding:8px 15px; font-size:14px; background:#17a2b8;">解析文字</button>
+            </div>
+        </div>
         <div id="previewSection" style="display:none; margin-top:20px; border-top: 1px dashed #ddd; padding-top: 20px;">
             <h3 style="margin-top:0; color:#2c3e50;">📝 資料預覽與編輯</h3>
             <div class="preview-grid">
@@ -180,6 +187,56 @@
             const code = groupCode.substring(0, 3).toUpperCase();
             const country = AIRPORT_MAP[code];
             if(country) document.getElementById('prev_country').value = country;
+        }
+    }
+
+    // === 新增：手動解析團號團名 ===
+    function parseManualString() {
+        const raw = document.getElementById('rawStringInput').value.trim();
+        if(!raw) {
+            alert("請先輸入文字串！");
+            return;
+        }
+
+        // 正則表達式邏輯說明：
+        // [A-Z]{3}  : 前三碼機場代碼 (如 CJJ)
+        // \d{2}     : 天數 (如 05)
+        // (\d{6})   : 日期 (如 260206)，這是我們要抓的 group[2]
+        // [A-Z0-9]* : 尾碼 (如 A)
+        const codeRegex = /([A-Z]{3}\d{2}(\d{6})[A-Z0-9]*)/;
+        const match = raw.match(codeRegex);
+
+        if (match) {
+            const fullGroupCode = match[1]; // 抓到的完整團號
+            const datePart = match[2];      // 抓到的日期部分 YYMMDD
+
+            // 1. 填入團號
+            document.getElementById('prev_groupNo').value = fullGroupCode;
+
+            // 2. 解析並填入團名 (把團號從原始字串中扣掉，剩下的就是團名)
+            let name = raw.replace(fullGroupCode, '').trim();
+            name = name.replace(/^[-\s]+/, ''); // 去除開頭多餘的橫線或空白
+            document.getElementById('prev_groupName').value = name;
+
+            // 3. 解析並填入日期
+            // 轉換 260206 -> 2026/02/06
+            const yy = parseInt(datePart.substring(0, 2));
+            const mm = datePart.substring(2, 4);
+            const dd = datePart.substring(4, 6);
+            const fullYear = 2000 + yy; 
+            
+            const isoDateStr = `${fullYear}/${mm}/${dd}`;
+            document.getElementById('prev_date').value = toRocDate(isoDateStr);
+
+            // 4. 觸發連動功能
+            updateCountryFromCode();
+            updateDateSpacing();
+
+            // 5. 顯示編輯區
+            document.getElementById('previewSection').style.display = 'block';
+
+        } else {
+            alert("無法辨識團號格式！\n請確認字串包含類似 'CJJ05260206A' 的結構。");
         }
     }
 
