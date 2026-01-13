@@ -63,6 +63,18 @@
                 <span>大陸個別</span>
             </label>
             <label class="radio-label">
+                <input type="radio" name="templateType" value="mgroup" onchange="handleTemplateChange()"> 
+                <span>國外團體MAC</span>
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="templateType" value="mindividual" onchange="handleTemplateChange()"> 
+                <span>國外個別MAC</span>
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="templateType" value="mindividualcn" onchange="handleTemplateChange()"> 
+                <span>大陸個別MAC</span>
+            </label>
+            <label class="radio-label">
                 <input type="radio" name="templateType" value="custom" onchange="handleTemplateChange()"> 
                 <span>上傳其他範本</span>
             </label>
@@ -172,7 +184,7 @@
             
             // 決定空格數量
             let spaces = "  "; // 預設 2 格 (團體)
-            if (templateType === 'individual' || templateType === 'individualcn') {
+            if (templateType === 'individual' || templateType === 'individualcn' || templateType === 'mindividual' || templateType === 'mindividualcn') {
                 spaces = "   "; // 個別約 3 格
             }
             
