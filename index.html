@@ -313,6 +313,8 @@
                 if (templateType === 'group') templateFilename = 'group.docx';
                 else if (templateType === 'individual') templateFilename = 'individual.docx';
                 else if (templateType === 'individualcn') templateFilename = 'individualcn.docx';
+                else if (templateType === 'mindividual') templateFilename = 'mindividual.docx';
+                else if (templateType === 'mindividualcn') templateFilename = 'mindividualcn.docx';
                 templateArrayBuffer = await loadDefaultTemplate(templateFilename);
             }
         } catch (e) { return; }
