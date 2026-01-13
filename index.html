@@ -311,6 +311,7 @@
                 templateArrayBuffer = await readFileAsArrayBuffer(fileInput);
             } else {
                 if (templateType === 'group') templateFilename = 'group.docx';
+                else if (templateType === 'mgroup') templateFilename = 'mgroup.docx';
                 else if (templateType === 'individual') templateFilename = 'individual.docx';
                 else if (templateType === 'individualcn') templateFilename = 'individualcn.docx';
                 else if (templateType === 'mindividual') templateFilename = 'mindividual.docx';
